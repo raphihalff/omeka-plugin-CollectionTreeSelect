@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Collection Tree Select — browser tests</title>
+<script>
+// Pin relative URLs to this directory: the "show" case rewrites the address bar
+// to mimic a collection page, which would otherwise break asset resolution.
+document.write('<base href="' + location.href.split('?')[0].replace(/[^/]*$/, '') + '">');
+</script>
+<link rel="stylesheet" href="../views/shared/css/vendor/select2.min.css">
+<link rel="stylesheet" href="../views/shared/css/collection-tree-select.css">
+<style id="hostile-theme">
+  /* A theme that fights back, as a real one did: id-scoped backgrounds and its
+     own list indentation, loaded after the plugin so ties go to the theme. */
+  #collection-tree { background: #0b7285; padding: 6px; }
+  #collection-tree ul { padding-left: 30px; margin: 4px 0; }
+  #collection-tree li { background: #0b7285; list-style: disc; }
+  #collection-tree li a, #collection-tree li a:visited { background: #0b7285; color: #e6fcff; }
+</style>
+<style>
+  body { font: 13px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #4d4d4d;
+         background: #f4f4f4; margin: 0; padding: 20px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #888;
+       margin: 20px 0 8px; }
+  .panel { background: #fff; border: 1px solid #ddd; padding: 14px; margin-bottom: 16px;
+           max-width: 420px; }
+  #results { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre;
+             background: #fff; border: 1px solid #ddd; padding: 14px; }
+  .pass { color: #1a7f37; } .fail { color: #b91c1c; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+<h2>Assertions</h2>
+<div id="results">running…</div>
+
+<script src="vendor/jquery.min.js"></script>
+<script src="../views/shared/javascripts/vendor/select2.full.min.js"></script>
+<script>
+// ---- fixtures -------------------------------------------------------------
+// 1 Americas > (4 Brazil, 5 Canada > 8 Ontario); 2 Europe > (6, 7); 3 Zoo
+var NAMES = {1:'Americas',2:'Europe',3:'Zoo',4:'Brazil',5:'Canada',6:'France',7:'Germany',8:'Ontario'};
+
+window.CollectionTreeSelect = {
+    depths:  {1:0,2:0,3:0,4:1,5:1,6:1,7:1,8:2},
+    parents: {1:0,2:0,3:0,4:1,5:1,6:2,7:2,8:5},
+    // Hues as _getHues() emits them for three roots.
+    colours: {1:210,2:30,3:300,4:210,5:210,6:30,7:30,8:210},
+    indent: 18, minSearch: 8, nbspPerLevel: 4, treePage: true,
+    selectors: ['select[name="metadata[collection_id]"]', '#collection-search'],
+    i18n: { search: 'Search collections', noMatch: 'No matching collections' }
+};
+
+var CASE = (location.search.match(/case=(\w+)/) || [])[1] || 'tree';
+var NB = ' ';
+function opt(v, t) { return '<option value="' + v + '">' + t + '</option>'; }
+
+// Batch edit: flat alphabetical, with Omeka's placeholder.
+var batch = '<select name="metadata[collection_id]">' + opt('', 'Select Below')
+    + [1,4,5,2,6,7,8,3].map(function (i) { return opt(i, NAMES[i]); }).join('') + '</select>';
+
+// Advanced search as the PHP filter leaves it: whole tree, indented, with the
+// "No Collection" entry under value 0.
+var search = '<select name="collection" id="collection-search">' + opt(0, 'No Collection')
+    + [[1,0],[4,1],[5,1],[8,2],[2,0],[6,1],[7,1],[3,0]].map(function (r) {
+          return opt(r[0], new Array(r[1] * 4 + 1).join(NB) + NAMES[r[0]]);
+      }).join('') + '</select>';
+
+function li(id, kids, unlinked) {
+    var label = unlinked ? NAMES[id]
+        : '<a href="/omeka/collections/show/' + id + '">' + NAMES[id] + '</a>';
+    return '<li>' + label + (kids || '') + '</li>';
+}
+var fullTree = '<div id="collection-tree"><ul>'
+    + li(1, '<ul>' + li(4) + li(5, '<ul>' + li(8) + '</ul>') + '</ul>')
+    + li(2, '<ul>' + li(6) + li(7) + '</ul>') + li(3) + '</ul></div>';
+// A collection show page: ancestors plus self, self rendered without a link.
+var showTree = '<div id="collection-tree"><ul>'
+    + li(1, '<ul>' + li(5, '<ul>' + li(8, null, true) + '</ul>') + '</ul>') + '</ul></div>';
+
+document.getElementById('stage').innerHTML =
+      '<h2>Batch edit select</h2><div class="panel">' + batch + '</div>'
+    + '<h2>Advanced search select</h2><div class="panel">' + search + '</div>'
+    + '<h2>Collection tree</h2><div class="panel">'
+    + (CASE === 'show' ? showTree : fullTree) + '</div>';
+
+if (CASE === 'show') {
+    // The unlinked row's id is read from the URL, so sit at a collection page.
+    history.replaceState({}, '', '/omeka/collections/show/8');
+}
+</script>
+<script src="../views/shared/javascripts/collection-tree-select.js"></script>
+<script>
+// ---- assertions -----------------------------------------------------------
+var out = [], failures = 0;
+function check(name, actual, expected) {
+    var ok = JSON.stringify(actual) === JSON.stringify(expected);
+    if (!ok) { failures++; }
+    out.push((ok ? 'PASS  ' : 'FAIL  ') + name + (ok ? ''
+        : '\n        expected: ' + JSON.stringify(expected)
+        + '\n        actual:   ' + JSON.stringify(actual)));
+}
+function vals(sel) {
+    return Array.prototype.map.call(document.querySelector(sel).options, function (o) {
+        return o.value === '' ? '-' : (o.value === '0' ? 'none' : NAMES[o.value]);
+    });
+}
+var ORDER = ['Americas','Brazil','Canada','Ontario','Europe','France','Germany','Zoo'];
+
+jQuery(function () { window.setTimeout(run, 0); });
+
+function run() {
+  try {
+    if (CASE === 'tree') {
+        var sheet = null;
+        for (var i = 0; i < document.styleSheets.length; i++) {
+            if ((document.styleSheets[i].href || '').indexOf('collection-tree-select.css') > -1) {
+                sheet = document.styleSheets[i];
+            }
+        }
+        check('plugin stylesheet parsed', sheet !== null && sheet.cssRules.length >= 12, true);
+
+        check('batch edit reordered into tree order',
+            vals('select[name="metadata[collection_id]"]'), ['-'].concat(ORDER));
+        check('search keeps "No Collection" first', vals('#collection-search'), ['none'].concat(ORDER));
+        check('select2 initialised',
+            jQuery('#collection-search').hasClass('select2-hidden-accessible'), true);
+
+        jQuery('#collection-search').select2('open');
+        var rows = jQuery('.select2-results__option').toArray().map(function (el) {
+            var s = el.querySelector('.cts-option');
+            return s ? { t: s.textContent, d: s.getAttribute('data-cts-depth'),
+                         a: s.style.getPropertyValue('--cts-accent').trim() }
+                     : { t: el.textContent, plain: true };
+        });
+        check('"No Collection" renders plain', rows[0], { t: 'No Collection', plain: true });
+        check('labels stripped of indentation', rows.slice(1).map(function (r) { return r.t; }), ORDER);
+        check('depths rendered', rows.slice(1).map(function (r) { return r.d; }),
+            ['0','1','1','2','0','1','1','0']);
+        check('one accent per tree', rows.slice(1).map(function (r) { return r.a; }),
+            ['hsl(210,55%,55%)','hsl(210,55%,55%)','hsl(210,55%,55%)','hsl(210,55%,55%)',
+             'hsl(30,55%,55%)','hsl(30,55%,55%)','hsl(30,55%,55%)','hsl(300,55%,55%)']);
+        jQuery('#collection-search').select2('close');
+
+        var tree = jQuery('#collection-tree .cts-row').toArray().map(function (el) {
+            return { t: el.textContent.trim(), d: el.getAttribute('data-cts-depth'),
+                     a: el.style.getPropertyValue('--cts-accent').trim(),
+                     tint: el.style.getPropertyValue('--cts-tint').trim() };
+        });
+        check('tree rows decorated in order', tree.map(function (r) { return r.t; }), ORDER);
+        check('tree depths from DOM nesting', tree.map(function (r) { return r.d; }),
+            ['0','1','1','2','0','1','1','0']);
+        check('tree accents match the dropdown exactly',
+            tree.map(function (r) { return r.a; }), rows.slice(1).map(function (r) { return r.a; }));
+        check('tint fades with depth', [tree[0].tint, tree[1].tint, tree[3].tint],
+            ['hsl(210,60%,88%)','hsl(210,60%,91%)','hsl(210,60%,92.5%)']);
+        check('root rows carry the root class',
+            jQuery('#collection-tree .cts-row.cts-root').toArray()
+                .map(function (el) { return el.textContent.trim(); }), ['Americas','Europe','Zoo']);
+
+        var first = document.querySelector('#collection-tree .cts-row');
+        check('tint beats the theme background',
+            getComputedStyle(first).backgroundColor, 'rgb(206, 224, 243)');
+        check('text forced to a readable colour', getComputedStyle(first).color, 'rgb(51, 51, 51)');
+        check('theme list indentation reset, so indents do not stack',
+            getComputedStyle(document.querySelector('#collection-tree ul')).paddingLeft, '0px');
+        check('theme bullets gone',
+            getComputedStyle(document.querySelector('#collection-tree li')).listStyleType, 'none');
+        check('rows are full-width blocks', getComputedStyle(first).display, 'block');
+        check('depth 2 indent = 2 x 18px + 10px gutter',
+            getComputedStyle(jQuery('#collection-tree .cts-row')[3]).paddingLeft, '46px');
+    }
+
+    if (CASE === 'show') {
+        var showRows = jQuery('#collection-tree .cts-row').toArray().map(function (el) {
+            return { t: el.textContent.trim(), tag: el.tagName.toLowerCase(),
+                     a: el.style.getPropertyValue('--cts-accent').trim() };
+        });
+        check('the unlinked current row is wrapped and decorated',
+            showRows.map(function (r) { return [r.t, r.tag]; }),
+            [['Americas','a'], ['Canada','a'], ['Ontario','span']]);
+        check('it is coloured from the URL, matching its tree', showRows[2].a, 'hsl(210,55%,55%)');
+        check('no stray text left outside a row',
+            jQuery('#collection-tree li').toArray().every(function (el) {
+                return Array.prototype.every.call(el.childNodes, function (n) {
+                    return n.nodeType !== 3 || n.nodeValue.trim() === '';
+                });
+            }), true);
+    }
+  } catch (e) {
+    failures++;
+    out.push('FAIL  threw: ' + (e && e.stack ? e.stack : e));
+  }
+
+  var el = document.getElementById('results');
+  el.textContent = '[case=' + CASE + ']\n' + out.join('\n') + '\n\n'
+      + (failures ? failures + ' FAILURE(S)' : 'all checks passed');
+  el.className = failures ? 'fail' : 'pass';
+  window.__ctsResults = { failures: failures, count: out.length };
+}
+</script>
+</body>
+</html>

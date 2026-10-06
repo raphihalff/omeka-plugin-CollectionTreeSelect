@@ -1,0 +1,15 @@
+# Keep development files out of the release archive built with `git archive`.
+# See doc/RELEASING.md.
+/.gitattributes export-ignore
+/.gitignore     export-ignore
+/.claude        export-ignore
+/test           export-ignore
+/doc            export-ignore
+
+# Vendored minified assets: don't let them skew language stats or clutter diffs.
+views/shared/javascripts/vendor/* linguist-vendored
+views/shared/css/vendor/*         linguist-vendored
+
+* text=auto eol=lf
+*.png binary
+*.jpg binary

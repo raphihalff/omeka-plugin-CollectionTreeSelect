@@ -1,0 +1,156 @@
+/*
+ * Collection Tree Select — tree picker and tree-page styling.
+ *
+ * --cts-indent, --cts-tint and --cts-accent are set inline per row by the init
+ * script; the fallbacks here are what an uncoloured row gets.
+ *
+ * @license GNU GPLv3
+ */
+
+/* Match Omeka's input metrics so the widget doesn't look bolted on. */
+.select2-container--default .select2-selection--single {
+    height: 34px;
+    border: 1px solid #b3b3b3;
+    border-radius: 3px;
+    background-color: #fff;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 32px;
+    color: #4d4d4d;
+    padding-left: 10px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 32px;
+}
+
+.select2-container--default .select2-results__option {
+    padding: 5px 10px;
+}
+
+/* Negative margins bleed over the list item's padding and re-apply it, so the
+   tint and stripe fill the whole row. */
+.cts-option {
+    display: block;
+    position: relative;
+    margin: -5px -10px;
+    padding: 5px 10px 5px calc(10px + var(--cts-indent, 0px));
+    background: var(--cts-tint, transparent);
+    /* Edge stripe at a fixed x for every depth, so a tree reads as one band. An
+       inset shadow costs no layout width and survives the highlight rule below. */
+    box-shadow: inset 3px 0 0 var(--cts-accent, transparent);
+}
+
+/* Root collections read as section headers without being unselectable. */
+.cts-option.cts-root {
+    font-weight: 600;
+}
+
+/* A hairline guide just left of each nested label, so deep trees stay readable. */
+.cts-option:not(.cts-root)::before {
+    content: '';
+    position: absolute;
+    left: calc(1px + var(--cts-indent, 0px));
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #cfcfcf;
+}
+
+/* Let select2's highlight show through; the stripe survives it. */
+.select2-container--default .select2-results__option--highlighted[aria-selected] .cts-option {
+    background: transparent !important;
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] .cts-option::before {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+/* Closed control: a dot in the colour of the tree the selection came from. */
+.cts-selection.cts-has-colour::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 7px;
+    border-radius: 50%;
+    background: var(--cts-accent);
+    vertical-align: baseline;
+}
+
+/* Keep the widget inside Omeka's column grid. */
+#collection-form .select2-container,
+.field .select2-container {
+    max-width: 100%;
+}
+
+/*
+ * CollectionTree's tree page, flattened from a nested <ul> into full-width rows
+ * indented by --cts-indent, so it reads like the open dropdown.
+ *
+ * Every selector matches the id as well as the .cts-tree class: a theme styling
+ * `#collection-tree ul` would outrank a bare class selector and keep its own list
+ * indentation, which then stacks on top of --cts-indent.
+ */
+#collection-tree.cts-tree ul,
+#collection-tree.cts-tree li {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: none;
+}
+
+#collection-tree.cts-tree .cts-row {
+    display: block;
+    position: relative;
+    padding: 6px 10px 6px calc(10px + var(--cts-indent, 0px));
+    box-shadow: inset 3px 0 0 var(--cts-accent, transparent);
+    text-decoration: none;
+}
+
+/*
+ * The one place this stylesheet uses !important: themes paint their own
+ * #collection-tree rows, and that outranks any selector here. Limited to
+ * .cts-tinted, so uncoloured rows keep the theme's background. The text colour
+ * goes with it — these tints are 88-96% light, and a theme's pale link text would
+ * be unreadable on them.
+ */
+#collection-tree.cts-tree .cts-row.cts-tinted {
+    background: var(--cts-tint) !important;
+    color: #333 !important;
+}
+
+/* Root collections read as section headers, matching the dropdown. */
+#collection-tree.cts-tree .cts-row.cts-root {
+    font-weight: 600;
+}
+
+/* Same hairline guide as the dropdown rows. */
+#collection-tree.cts-tree .cts-row:not(.cts-root)::before {
+    content: '';
+    position: absolute;
+    left: calc(1px + var(--cts-indent, 0px));
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #cfcfcf;
+}
+
+/* A link row is still a link; keep a hover affordance the tint cannot hide. */
+#collection-tree.cts-tree a.cts-row:hover,
+#collection-tree.cts-tree a.cts-row:focus {
+    text-decoration: underline;
+}
+
+/* The unlinked row is the collection you are looking at. */
+#collection-tree.cts-tree span.cts-row {
+    font-style: italic;
+}
+
+/* Plain-select fallback: preserve the non-breaking-space indentation. */
+select#collection-id option,
+select[name="metadata[collection_id]"] option,
+select[name="collection_tree_parent_collection_id"] option {
+    white-space: pre;
+}
