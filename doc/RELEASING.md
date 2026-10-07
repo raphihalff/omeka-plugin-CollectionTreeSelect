@@ -30,8 +30,8 @@ up automatically.
 3. Commit and tag:
 
    ```bash
-   git commit -am "Release 1.3.1"
-   git tag -a v1.3.1 -m "Release 1.3.1"
+   git commit -am "Release 1.4"
+   git tag -a v1.4 -m "Release 1.4"
    git push origin main --tags
    ```
 
@@ -39,14 +39,14 @@ up automatically.
    `.gitattributes` keeps `test/`, `doc/` and the dotfiles out:
 
    ```bash
-   git archive --format=zip --prefix=CollectionTreeSelect/ -o CollectionTreeSelect-1.3.1.zip v1.3.1
+   git archive --format=zip --prefix=CollectionTreeSelect/ -o CollectionTreeSelect-1.4.zip v1.4
    ```
 
 5. Check it before uploading — one top-level directory, `plugin.ini` present, no
    `test/`:
 
    ```bash
-   unzip -l CollectionTreeSelect-1.3.1.zip | head -20
+   unzip -l CollectionTreeSelect-1.4.zip | head -20
    ```
 
 6. Draft a release on the tag, attach the ZIP, publish.

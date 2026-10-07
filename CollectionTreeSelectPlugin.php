@@ -13,7 +13,7 @@
 class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
 {
     /** Asset cache-buster. Bump when shipping changed JS/CSS. */
-    const ASSET_VERSION = '1.3.1';
+    const ASSET_VERSION = '1.4';
 
     /** Non-breaking space (U+00A0), UTF-8. */
     const NBSP = "\xC2\xA0";
@@ -24,8 +24,11 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
     /** Runs before everyone else's. @see captureCollectionsSelectOptions() */
     const FILTER_PRIORITY_CAPTURE = 1;
 
-    /** Hue of the first root, in degrees. */
-    const HUE_ORIGIN = 210;
+    /** Hue of the first root, in degrees. 210 is a mid blue. */
+    const DEFAULT_HUE_ORIGIN = 210;
+
+    /** Mid-scale colour strength; 50 is the palette this plugin shipped with. */
+    const DEFAULT_INTENSITY = 50;
 
     /** How far up a parent chain _getTree() walks before giving up. */
     const MAX_DEPTH = 64;
@@ -53,6 +56,10 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
         // Non-breaking spaces per level in the plain (no-JS) select. 0 = leave alone.
         'collection_tree_select_nbsp_per_level' => 4,
         'collection_tree_select_colour_roots' => 1,
+        // Hue given to the first tree; the rest are spaced out from it.
+        'collection_tree_select_hue_origin' => self::DEFAULT_HUE_ORIGIN,
+        // 0 = barely tinted, 100 = strongest. @see _queueAssets()
+        'collection_tree_select_colour_intensity' => self::DEFAULT_INTENSITY,
         // Extend all of the above to the public theme.
         'collection_tree_select_public' => 0,
         // Put back collections CollectionTree strips from select options.
@@ -67,6 +74,15 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
         'collection_tree_select_public',
         'collection_tree_select_full_options',
         'collection_tree_select_colour_tree_page',
+    );
+
+    /** Numeric options, clamped to these bounds on save. @see hookConfig() */
+    protected $_numericOptions = array(
+        'collection_tree_select_indent' => array(0, 200),
+        'collection_tree_select_min_search' => array(0, 1000),
+        'collection_tree_select_nbsp_per_level' => array(0, 20),
+        'collection_tree_select_hue_origin' => array(0, 359),
+        'collection_tree_select_colour_intensity' => array(0, 100),
     );
 
     /** @var array|null Memoised depths/parents/roots. */
@@ -138,9 +154,17 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
     {
         $post = $args['post'];
         foreach ($this->_options as $key => $default) {
-            if (isset($post[$key])) {
-                set_option($key, $post[$key]);
+            if (!isset($post[$key])) {
+                continue;
             }
+            $value = $post[$key];
+            // Clamp rather than reject: a stray value should not break rendering.
+            if (isset($this->_numericOptions[$key])) {
+                list($min, $max) = $this->_numericOptions[$key];
+                $value = is_numeric($value) ? (int) $value : $default;
+                $value = max($min, min($max, $value));
+            }
+            set_option($key, $value);
         }
         foreach ($this->_checkboxOptions as $key) {
             if (!isset($post[$key])) {
@@ -500,9 +524,11 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
             'parents'      => (object) $tree['parents'],
             // collection_id => hue, shared by a whole tree. Empty when colours off.
             'colours'      => (object) $colours,
-            'indent'       => (int) get_option('collection_tree_select_indent'),
-            'minSearch'    => (int) get_option('collection_tree_select_min_search'),
-            'nbspPerLevel' => (int) get_option('collection_tree_select_nbsp_per_level'),
+            // 0-100; the client derives saturation and lightness from it.
+            'intensity'    => $this->_numericOption('collection_tree_select_colour_intensity'),
+            'indent'       => $this->_numericOption('collection_tree_select_indent'),
+            'minSearch'    => $this->_numericOption('collection_tree_select_min_search'),
+            'nbspPerLevel' => $this->_numericOption('collection_tree_select_nbsp_per_level'),
             'treePage'     => (bool) $wantsTreePage,
             'selectors'    => apply_filters('collection_tree_select_selectors', array(
                 // Item add / edit.
@@ -696,9 +722,11 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
         $roots = array_unique(array_values($tree['roots']));
         sort($roots);
 
+        $origin = $this->_numericOption('collection_tree_select_hue_origin');
+
         $hues = array();
         foreach ($roots as $index => $rootId) {
-            $hue = self::HUE_ORIGIN + 360 * $this->_radicalInverse($index);
+            $hue = $origin + 360 * $this->_radicalInverse($index);
             $hues[$rootId] = round(fmod($hue, 360), 1);
         }
 
@@ -708,6 +736,28 @@ class CollectionTreeSelectPlugin extends Omeka_Plugin_AbstractPlugin
         }
 
         return $colours;
+    }
+
+    /**
+     * A numeric option, clamped and falling back to its default.
+     *
+     * Values are already clamped on save; this guards options written before the
+     * bounds existed, or set directly in the database.
+     *
+     * @param string $key
+     * @return int
+     */
+    protected function _numericOption($key)
+    {
+        $default = $this->_options[$key];
+        list($min, $max) = $this->_numericOptions[$key];
+
+        $value = get_option($key);
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return $default;
+        }
+
+        return max($min, min($max, (int) $value));
     }
 
     /**

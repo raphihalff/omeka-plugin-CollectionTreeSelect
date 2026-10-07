@@ -34,6 +34,40 @@
 
 <div class="field">
     <div class="two columns alpha">
+        <label for="collection_tree_select_hue_origin"><?php echo __('Starting colour'); ?></label>
+    </div>
+    <div class="inputs five columns omega">
+        <p class="explanation"><?php echo __('Hue given to the first tree, in degrees around the colour '
+            . 'wheel: 0 red, 60 yellow, 120 green, 180 cyan, 210 blue (the default), 300 magenta. The '
+            . 'remaining trees are spaced out from it automatically. Change this to bring the palette '
+            . 'closer to your site\'s own colours.'); ?></p>
+        <?php echo $this->formText(
+            'collection_tree_select_hue_origin',
+            get_option('collection_tree_select_hue_origin'),
+            array('size' => 5, 'type' => 'number', 'min' => 0, 'max' => 359)
+        ); ?>
+    </div>
+</div>
+
+<div class="field">
+    <div class="two columns alpha">
+        <label for="collection_tree_select_colour_intensity"><?php echo __('Colour intensity'); ?></label>
+    </div>
+    <div class="inputs five columns omega">
+        <p class="explanation"><?php echo __('How strong the tints are, from 0 for barely-there to 100 '
+            . 'for vivid. 50 is the default. Lower it if the colours compete with your interface; raise '
+            . 'it if they are too subtle to tell apart. The coloured edge stripe stays legible at any '
+            . 'setting.'); ?></p>
+        <?php echo $this->formText(
+            'collection_tree_select_colour_intensity',
+            get_option('collection_tree_select_colour_intensity'),
+            array('size' => 5, 'type' => 'number', 'min' => 0, 'max' => 100)
+        ); ?>
+    </div>
+</div>
+
+<div class="field">
+    <div class="two columns alpha">
         <label for="collection_tree_select_colour_tree_page"><?php echo __('Colour the Collection Tree page'); ?></label>
     </div>
     <div class="inputs five columns omega">

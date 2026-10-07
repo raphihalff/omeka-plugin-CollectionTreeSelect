@@ -50,6 +50,8 @@ indentation.
 |---|---|---|
 | Enable tree picker | on | Off leaves dropdowns native, indentation only |
 | Colour-code trees | on | Tint each collection with its top-level ancestor's colour |
+| Starting colour | 210 | Hue of the first tree, in degrees: 0 red, 120 green, 210 blue, 300 magenta |
+| Colour intensity | 50 | Tint strength, 0 barely-there to 100 vivid |
 | Colour the Collection Tree page | on | Extend those colours to the tree page |
 | Full collection list in dropdowns | on | Restore subcollections stripped from public select options |
 | Apply to the public site | **off** | Extend all of the above to the public theme |
@@ -91,6 +93,12 @@ position among the roots sorted by id, using the base-2 van der Corput sequence.
 Adding a child or renaming a collection never reshuffles the palette; only adding
 or removing a top-level collection shifts the roots after it. Spacing is exactly
 optimal at 2, 4, 8 and 16 roots and no worse than about 62% of optimal in between.
+
+**Starting colour** rotates that whole wheel, so you can bring the palette toward
+your site's own colours without losing the spacing. **Colour intensity** scales
+saturation and darkness together; the coloured edge stripe keeps its strength at
+any setting, so trees stay distinguishable even at 0. Both are clamped on save,
+and 50 reproduces the palette exactly as it shipped before the settings existed.
 
 **The tree page is restyled assertively.** It belongs to your theme, so the
 plugin's selectors match on `#collection-tree` as well as its own class, and the

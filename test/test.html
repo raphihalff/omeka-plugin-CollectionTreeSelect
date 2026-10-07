@@ -49,6 +49,11 @@ window.CollectionTreeSelect = {
     // Hues as _getHues() emits them for three roots.
     colours: {1:210,2:30,3:300,4:210,5:210,6:30,7:30,8:210},
     indent: 18, minSearch: 8, nbspPerLevel: 4, treePage: true,
+    // Note the explicit null check: `|| 50` would swallow intensity=0.
+    intensity: (function () {
+        var m = location.search.match(/intensity=(\d+)/);
+        return m ? parseInt(m[1], 10) : 50;
+    }()),
     selectors: ['select[name="metadata[collection_id]"]', '#collection-search'],
     i18n: { search: 'Search collections', noMatch: 'No matching collections' }
 };
@@ -113,6 +118,8 @@ jQuery(function () { window.setTimeout(run, 0); });
 
 function run() {
   try {
+    var I = window.CollectionTreeSelect.intensity;
+
     if (CASE === 'tree') {
         var sheet = null;
         for (var i = 0; i < document.styleSheets.length; i++) {
@@ -139,9 +146,12 @@ function run() {
         check('labels stripped of indentation', rows.slice(1).map(function (r) { return r.t; }), ORDER);
         check('depths rendered', rows.slice(1).map(function (r) { return r.d; }),
             ['0','1','1','2','0','1','1','0']);
-        check('one accent per tree', rows.slice(1).map(function (r) { return r.a; }),
-            ['hsl(210,55%,55%)','hsl(210,55%,55%)','hsl(210,55%,55%)','hsl(210,55%,55%)',
-             'hsl(30,55%,55%)','hsl(30,55%,55%)','hsl(30,55%,55%)','hsl(300,55%,55%)']);
+        var accents = rows.slice(1).map(function (r) { return r.a; });
+        check('one accent per tree, three distinct trees',
+            [accents.slice(0, 4), accents.slice(4, 7), accents.slice(7),
+             new Set(accents).size],
+            [[accents[0],accents[0],accents[0],accents[0]],
+             [accents[4],accents[4],accents[4]], [accents[7]], 3]);
         jQuery('#collection-search').select2('close');
 
         var tree = jQuery('#collection-tree .cts-row').toArray().map(function (el) {
@@ -154,15 +164,36 @@ function run() {
             ['0','1','1','2','0','1','1','0']);
         check('tree accents match the dropdown exactly',
             tree.map(function (r) { return r.a; }), rows.slice(1).map(function (r) { return r.a; }));
-        check('tint fades with depth', [tree[0].tint, tree[1].tint, tree[3].tint],
-            ['hsl(210,60%,88%)','hsl(210,60%,91%)','hsl(210,60%,92.5%)']);
+        var light = [tree[0].tint, tree[1].tint, tree[3].tint].map(function (t) {
+            return parseFloat(t.split(',')[2]);
+        });
+        check('tint lightens with depth', light[0] < light[1] && light[1] < light[3 - 1], true);
         check('root rows carry the root class',
             jQuery('#collection-tree .cts-row.cts-root').toArray()
                 .map(function (el) { return el.textContent.trim(); }), ['Americas','Europe','Zoo']);
 
+        // Intensity 50 must reproduce the palette exactly as it was before the
+        // setting existed; anything else is a silent restyle of every install.
+        if (I === 50) {
+            check('intensity 50 reproduces the original tint', tree[0].tint, 'hsl(210,60%,88%)');
+            check('intensity 50 reproduces the original accent', tree[0].a, 'hsl(210,55%,55%)');
+        }
+        if (I === 0) {
+            check('intensity 0 is pale and desaturated', tree[0].tint, 'hsl(210,30%,96%)');
+            check('intensity 0 keeps a legible stripe', tree[0].a, 'hsl(210,30%,55%)');
+        }
+        if (I === 100) {
+            check('intensity 100 is strong', tree[0].tint, 'hsl(210,90%,80%)');
+            check('intensity 100 keeps a legible stripe', tree[0].a, 'hsl(210,80%,55%)');
+        }
+        check('tints carry at most one decimal',
+            tree.every(function (r) { return /^hsl\(\d+(\.\d)?,\d+(\.\d)?%,\d+(\.\d)?%\)$/.test(r.tint); }),
+            true);
+
         var first = document.querySelector('#collection-tree .cts-row');
-        check('tint beats the theme background',
-            getComputedStyle(first).backgroundColor, 'rgb(206, 224, 243)');
+        var bg = getComputedStyle(first).backgroundColor;
+        check('tint beats the theme background', bg !== 'rgb(11, 114, 133)', true);
+        if (I === 50) { check('and is the expected tint', bg, 'rgb(206, 224, 243)'); }
         check('text forced to a readable colour', getComputedStyle(first).color, 'rgb(51, 51, 51)');
         check('theme list indentation reset, so indents do not stack',
             getComputedStyle(document.querySelector('#collection-tree ul')).paddingLeft, '0px');

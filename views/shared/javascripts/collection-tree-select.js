@@ -40,15 +40,25 @@
     var NBSP_RUN_RE = /^\u00a0+/;
     var DASH_RUN_RE = /^-+/;
 
-    // Light enough that dark option text stays readable at every hue; deeper
-    // levels fade further.
-    var TINT_SATURATION = 60;
-    var TINT_LIGHTNESS_ROOT = 88;
-    var TINT_LIGHTNESS_CHILD = 91;
+    /*
+     * Palette, derived from the configured intensity (0-100).
+     *
+     * Higher intensity means more saturated and darker tints. The scales are set
+     * so that intensity 50 reproduces the palette exactly as it shipped before
+     * the setting existed, and so that the lightest tint stays light enough for
+     * dark text at every hue.
+     */
+    var INTENSITY = typeof config.intensity === 'number'
+        ? Math.max(0, Math.min(100, config.intensity))
+        : 50;
+
+    var TINT_SATURATION = 30 + INTENSITY * 0.6;      // 50 -> 60
+    var TINT_LIGHTNESS_ROOT = 96 - INTENSITY * 0.16; // 50 -> 88
+    var TINT_LIGHTNESS_CHILD = TINT_LIGHTNESS_ROOT + 3;
+    var TINT_LIGHTNESS_MAX = TINT_LIGHTNESS_ROOT + 8;
     var TINT_LIGHTNESS_STEP = 1.5;
-    var TINT_LIGHTNESS_MAX = 96;
-    // Full-strength edge stripe and selection dot.
-    var ACCENT_SATURATION = 55;
+    // Edge stripe and selection dot: full strength, so they stay legible.
+    var ACCENT_SATURATION = 30 + INTENSITY * 0.5;    // 50 -> 55
     var ACCENT_LIGHTNESS = 55;
 
     function has(obj, key) {
@@ -94,6 +104,11 @@
         return value !== '' && has(colours, value) ? colours[value] : null;
     }
 
+    /** One decimal, so derived percentages don't carry float noise into the CSS. */
+    function pct(n) {
+        return Math.round(n * 10) / 10;
+    }
+
     function tint(hue, depth) {
         var lightness = depth === 0
             ? TINT_LIGHTNESS_ROOT
@@ -101,11 +116,11 @@
                 TINT_LIGHTNESS_MAX,
                 TINT_LIGHTNESS_CHILD + (depth - 1) * TINT_LIGHTNESS_STEP
             );
-        return 'hsl(' + hue + ',' + TINT_SATURATION + '%,' + lightness + '%)';
+        return 'hsl(' + hue + ',' + pct(TINT_SATURATION) + '%,' + pct(lightness) + '%)';
     }
 
     function accent(hue) {
-        return 'hsl(' + hue + ',' + ACCENT_SATURATION + '%,' + ACCENT_LIGHTNESS + '%)';
+        return 'hsl(' + hue + ',' + pct(ACCENT_SATURATION) + '%,' + ACCENT_LIGHTNESS + '%)';
     }
 
     /**

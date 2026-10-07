@@ -11,6 +11,7 @@ abstract class Omeka_Plugin_AbstractPlugin
 $GLOBALS['options'] = array();
 function plugin_is_active($n) { return true; }
 function get_option($n) { return isset($GLOBALS['options'][$n]) ? $GLOBALS['options'][$n] : null; }
+function set_option($n, $v) { $GLOBALS['options'][$n] = $v; }
 function apply_filters($n, $v) { return $v; }
 function __($s) { return $s; }
 function strip_formatting($s) { return $s; }
@@ -98,6 +99,8 @@ function resetOptions()
         'collection_tree_select_colour_roots' => 1,
         'collection_tree_select_full_options' => 1,
         'collection_tree_select_nbsp_per_level' => 4,
+        'collection_tree_select_hue_origin' => 210,
+        'collection_tree_select_colour_intensity' => 50,
     );
 }
 resetOptions();
@@ -168,6 +171,55 @@ function minGap($n)
 }
 check('8 roots evenly spread', round(minGap(8), 1), 45.0);
 check('40 roots keep over half of optimal', minGap(40) > (360/40)/2, true);
+
+echo "\n---- colour settings ----\n";
+$GLOBALS['options']['collection_tree_select_hue_origin'] = 0;
+$shifted = (new Probe($TREE))->call('_getHues');
+check('starting colour moves the whole palette', $shifted[1], 0.0);
+// Gaps compared modulo 360: shifting the origin rotates the wheel, so a gap of
+// -180 before becomes +180 after without the spacing having changed.
+function gap($a, $b) { return fmod($a - $b + 720, 360); }
+check('and keeps the spacing between trees',
+    array(gap($shifted[2], $shifted[1]), gap($shifted[3], $shifted[1])),
+    array(gap($hues[2], $hues[1]), gap($hues[3], $hues[1])));
+$GLOBALS['options']['collection_tree_select_hue_origin'] = 300;
+$wrapped = (new Probe($TREE))->call('_getHues');
+check('hues past 360 wrap round', $wrapped[2], 120.0);
+check('all hues stay in range',
+    array_filter($wrapped, function ($h) { return $h < 0 || $h >= 360; }), array());
+resetOptions();
+
+// Values written before the bounds existed, or edited straight in the database.
+$GLOBALS['options']['collection_tree_select_hue_origin'] = 900;
+check('an out-of-range hue is clamped, not wrapped blindly',
+    (new Probe($TREE))->call('_numericOption', array('collection_tree_select_hue_origin')), 359);
+$GLOBALS['options']['collection_tree_select_hue_origin'] = 'blue';
+check('a non-numeric hue falls back to the default',
+    (new Probe($TREE))->call('_numericOption', array('collection_tree_select_hue_origin')), 210);
+$GLOBALS['options']['collection_tree_select_hue_origin'] = null;
+check('an unset hue falls back to the default',
+    (new Probe($TREE))->call('_numericOption', array('collection_tree_select_hue_origin')), 210);
+$GLOBALS['options']['collection_tree_select_colour_intensity'] = -20;
+check('intensity clamps at 0',
+    (new Probe($TREE))->call('_numericOption', array('collection_tree_select_colour_intensity')), 0);
+resetOptions();
+
+// hookConfig clamps on save, so bad input never reaches the database.
+$cfg = new Probe($TREE);
+$cfg->plugin->hookConfig(array('post' => array(
+    'collection_tree_select_hue_origin' => '999',
+    'collection_tree_select_colour_intensity' => 'loud',
+    'collection_tree_select_indent' => '-5',
+    'collection_tree_select_min_search' => '12',
+)));
+check('saving clamps a too-large hue', get_option('collection_tree_select_hue_origin'), 359);
+check('saving replaces non-numeric intensity with the default',
+    get_option('collection_tree_select_colour_intensity'), 50);
+check('saving clamps a negative indent', get_option('collection_tree_select_indent'), 0);
+check('saving keeps a valid value', get_option('collection_tree_select_min_search'), 12);
+check('unticked checkboxes are stored as off',
+    get_option('collection_tree_select_colour_roots'), 0);
+resetOptions();
 
 echo "\n---- _sortByTree ----\n";
 $p = new Probe($TREE);
